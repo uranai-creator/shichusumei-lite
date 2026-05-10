@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="四柱推命">
+<meta name="theme-color" content="#1a1410">
+<title>四柱推命ツール［ライト版］</title>
+<style>
+:root{
+  --ink:#1a1410;--paper:#faf6ef;--paper2:#f3ede2;
+  --gold:#b8912a;--gold-l:#d4a843;--gold-ll:#f0d070;--gold-dim:#5a4418;
+  --border:#d4c4a0;--muted:#8a7a5a;--text:#2a2018;
+  --ki:#2d7a2d;--hi:#8b2020;--ts:#7a6010;--ka:#4a6080;--mi:#1a4880;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--paper);color:var(--text);font-family:'Hiragino Mincho ProN','Yu Mincho',serif;min-height:100vh;}
+
+/* ローディング */
+.ld-overlay{position:fixed;inset:0;background:rgba(26,20,16,0.95);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.ld-overlay.show{opacity:1;pointer-events:all;}
+.ld-ring{width:70px;height:70px;position:relative;margin-bottom:20px;}
+.ld-ring::before,.ld-ring::after{content:'';position:absolute;inset:0;border:2px solid transparent;border-top-color:var(--gold);border-radius:50%;}
+.ld-ring::before{animation:spin 1s linear infinite;}
+.ld-ring::after{inset:10px;border-top-color:var(--gold-ll);animation:spin 0.7s linear infinite reverse;}
+.ld-kanji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gold-ll);}
+.ld-text{color:var(--gold-ll);font-size:13px;letter-spacing:0.3em;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ウェルカムモーダル */
+.modal-bg{position:fixed;inset:0;background:rgba(20,16,8,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.hidden{display:none;}
+.modal{background:var(--paper);border:1px solid var(--gold);max-width:460px;width:100%;max-height:88vh;overflow-y:auto;}
+.modal-head{background:var(--ink);padding:18px 16px;text-align:center;border-bottom:2px solid var(--gold);}
+.modal-head h2{font-size:17px;color:var(--gold-ll);letter-spacing:0.1em;font-weight:300;}
+.modal-head p{font-size:10px;color:#6a5a40;margin-top:5px;}
+.modal-body{padding:18px 16px;}
+.ms{margin-bottom:16px;}
+.ms h3{font-size:10px;color:var(--gold);letter-spacing:0.2em;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.mstep{display:flex;gap:10px;margin-bottom:8px;}
+.mnum{background:var(--ink);color:var(--gold-ll);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.mtext{font-size:12px;line-height:1.7;}
+.mtext strong{color:var(--gold);}
+.mnote{background:var(--paper2);border:1px solid var(--border);padding:10px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:14px;}
+.mstart{display:block;width:100%;background:var(--ink);color:var(--gold-ll);border:none;padding:13px;font-size:13px;font-family:inherit;letter-spacing:0.2em;cursor:pointer;border-bottom:2px solid var(--gold);}
+
+/* ツールチップ */
+.tip-bg{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,16,8,0.7);}
+.tip-bg.hidden{display:none;}
+.tip-box{background:var(--paper);border:1px solid var(--gold);max-width:320px;width:100%;}
+.tip-head{background:var(--ink);padding:11px 13px;display:flex;justify-content:space-between;align-items:center;}
+.tip-head h4{font-size:13px;color:var(--gold-ll);}
+.tip-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;}
+.tip-body{padding:13px 15px;font-size:12px;line-height:1.9;}
+.tip{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;background:var(--gold-dim);color:var(--gold-ll);border-radius:50%;font-size:9px;cursor:pointer;margin-left:3px;vertical-align:middle;}
+
+/* 履歴 */
+.hist-bg{position:fixed;inset:0;background:rgba(20,16,8,0.92);z-index:1500;display:flex;align-items:flex-end;justify-content:center;}
+.hist-bg.hidden{display:none;}
+.hist-sheet{background:var(--paper);border-top:2px solid var(--gold);width:100%;max-width:720px;max-height:70vh;overflow-y:auto;}
+.hist-head{background:var(--ink);padding:13px 15px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;}
+.hist-head h3{font-size:11px;color:var(--gold-ll);letter-spacing:0.15em;}
+.hist-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+.hist-item{padding:12px 15px;border-bottom:1px solid var(--border);cursor:pointer;}
+.hist-item:hover{background:var(--paper2);}
+.hist-name{font-size:13px;font-weight:700;margin-bottom:3px;}
+.hist-info{font-size:10px;color:var(--muted);}
+.hist-empty{text-align:center;padding:36px 16px;color:var(--muted);font-size:12px;}
+.hist-del{float:right;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 6px;}
+
+/* ヘッダー */
+.header{background:var(--ink);padding:22px 18px 18px;text-align:center;border-bottom:3px solid var(--gold);}
+.plan-badge{display:inline-block;border:1px solid var(--gold);color:var(--gold-ll);font-size:10px;letter-spacing:0.3em;padding:3px 13px;margin-bottom:11px;}
+.header h1{font-size:clamp(14px,3.5vw,20px);color:#f5ead0;letter-spacing:0.1em;font-weight:300;line-height:1.5;}
+.header-sub{font-size:10px;color:#6a5a40;letter-spacing:0.08em;margin-top:7px;}
+
+main{max-width:720px;margin:0 auto;padding:18px 13px 50px;}
+
+/* 入力 */
+.inp-card{background:white;border:1px solid var(--border);border-top:3px solid var(--gold);padding:18px 15px;margin-bottom:18px;}
+.inp-card h2{font-size:10px;color:var(--gold);letter-spacing:0.25em;margin-bottom:5px;padding-bottom:9px;border-bottom:1px solid var(--border);}
+.inp-hint{font-size:11px;color:var(--muted);margin-bottom:13px;line-height:1.6;}
+.inp-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.inp-grid.three{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:10px;color:var(--muted);letter-spacing:0.08em;}
+.field input,.field select{background:var(--paper2);border:1px solid var(--border);color:var(--text);padding:9px 10px;font-size:14px;font-family:inherit;outline:none;-webkit-appearance:none;transition:border-color 0.2s;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--gold);}
+.calc-btn{display:block;width:100%;margin-top:13px;background:var(--ink);color:var(--gold-ll);border:none;padding:13px;font-size:13px;font-family:inherit;letter-spacing:0.18em;cursor:pointer;border-bottom:2px solid var(--gold);}
+.hist-btn{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--border);color:var(--muted);padding:8px 13px;font-size:11px;font-family:inherit;cursor:pointer;margin-top:7px;width:100%;}
+.hist-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+/* タブ */
+.result{display:none;}.result.show{display:block;}
+.tabs{display:flex;overflow-x:auto;background:var(--ink);border-bottom:1px solid var(--gold-dim);scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{padding:12px 14px;font-size:11px;color:#5a4a30;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0;letter-spacing:0.07em;}
+.tab.active{color:var(--gold-ll);border-bottom-color:var(--gold);}
+.page{display:none;padding:18px 0;}.page.active{display:block;}
+
+/* 命式 */
+.m-title{text-align:center;padding:13px;background:var(--ink);color:var(--gold-ll);margin-bottom:2px;font-size:11px;letter-spacing:0.18em;border-top:2px solid var(--gold);}
+.m-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:14px;}
+.pillar{background:white;border:1px solid var(--border);}
+.p-head{background:var(--ink);color:var(--gold-ll);text-align:center;padding:7px 3px;font-size:10px;letter-spacing:0.18em;border-bottom:1px solid var(--gold);}
+.p-desc{background:var(--paper2);padding:4px 5px;font-size:9px;color:var(--muted);text-align:center;border-bottom:1px solid var(--border);line-height:1.4;}
+.p-row{display:flex;flex-direction:column;align-items:center;padding:8px 3px;border-bottom:1px solid var(--border);}
+.p-row:last-child{border-bottom:none;}
+.p-lbl{font-size:9px;color:var(--muted);margin-bottom:2px;}
+.kanji{font-size:clamp(19px,4.2vw,30px);font-weight:700;line-height:1;}
+.p-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+.p-mid{font-size:12px;}
+.gki{color:var(--ki);}.ghi{color:var(--hi);}.gts{color:var(--ts);}.gka{color:var(--ka);}.gmi{color:var(--mi);}
+
+/* セクション */
+.stitle{font-size:10px;color:var(--gold);letter-spacing:0.22em;margin:18px 0 9px;padding-left:9px;border-left:2px solid var(--gold);}
+.iblock{background:white;border:1px solid var(--border);padding:13px 15px;margin-bottom:11px;}
+.iblock h3{font-size:10px;color:var(--gold);letter-spacing:0.18em;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.irow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(212,196,160,0.3);}
+.irow:last-child{border-bottom:none;}
+.irow .v{color:var(--gold);font-weight:700;}
+.inote{font-size:10px;color:var(--muted);margin-top:7px;padding-top:7px;border-top:1px solid var(--border);line-height:1.7;}
+.help-bar{background:var(--paper2);border:1px solid var(--border);border-left:3px solid var(--gold-dim);padding:9px 11px;margin-bottom:14px;font-size:11px;color:var(--muted);line-height:1.7;}
+
+/* テーブル */
+.dtbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:13px;}
+.dtbl th{background:var(--ink);color:var(--gold-ll);padding:7px 5px;text-align:center;border:1px solid #3a2a10;font-size:9px;letter-spacing:0.07em;font-weight:400;}
+.dtbl td{background:white;padding:7px 5px;text-align:center;border:1px solid var(--border);}
+.dtbl .cur td{background:#fdf5e0;}
+.dtbl .cur td:first-child{border-left:3px solid var(--gold);}
+.tblnote{font-size:10px;color:var(--muted);margin-bottom:11px;padding:7px 9px;background:var(--paper2);border-left:2px solid var(--gold-dim);line-height:1.7;}
+
+/* 五行 */
+.bal-row{display:flex;gap:5px;margin-bottom:11px;align-items:flex-end;}
+.bal-item{flex:1;text-align:center;}
+.bal-lbl{font-size:17px;font-weight:700;margin-bottom:4px;}
+.bal-bar{height:65px;background:var(--paper2);border:1px solid var(--border);display:flex;align-items:flex-end;overflow:hidden;}
+.bal-fill{width:100%;}
+.bal-cnt{font-size:9px;color:var(--muted);margin-top:3px;}
+
+/* 鑑定書 */
+.kanteisho{background:white;border:1px solid var(--border);padding:16px 15px;margin-bottom:11px;}
+.kanteisho h3{font-size:10px;color:var(--gold);letter-spacing:0.18em;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.kanteisho p{font-size:13px;line-height:2.1;}
+.pdf-btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:white;color:var(--gold);border:2px solid var(--gold);padding:12px;font-size:12px;font-family:inherit;letter-spacing:0.13em;cursor:pointer;margin-top:9px;}
+.pdf-btn:hover{background:var(--gold);color:white;}
+.save-btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:white;color:var(--muted);border:1px solid var(--border);padding:11px;font-size:12px;font-family:inherit;letter-spacing:0.1em;cursor:pointer;margin-top:7px;}
+.save-btn:hover{border-color:var(--gold);color:var(--gold);}
+.plan-banner{background:var(--ink);color:var(--gold-ll);text-align:center;padding:15px;margin:18px 0;font-size:11px;letter-spacing:0.13em;line-height:1.8;}
+
+/* AIプロンプト */
+.theme-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:11px;}
+.theme-btn{background:white;border:1px solid var(--border);color:var(--text);padding:9px 7px;font-size:11px;font-family:inherit;cursor:pointer;text-align:left;line-height:1.4;transition:border-color 0.2s;}
+.theme-btn:hover,.theme-btn.sel{border-color:var(--gold);color:var(--gold);}
+.prompt-box{background:var(--paper2);border:1px solid var(--border);padding:12px;font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-all;margin-bottom:9px;max-height:260px;overflow-y:auto;}
+.copy-btn{display:block;width:100%;background:var(--ink);color:var(--gold-ll);border:none;padding:12px;font-size:12px;font-family:inherit;letter-spacing:0.15em;cursor:pointer;border-bottom:2px solid var(--gold);margin-bottom:11px;}
+
+/* 五行テーブル */
+.gtbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:13px;}
+.gtbl th{background:var(--ink);color:var(--gold-ll);padding:7px 5px;text-align:center;border:1px solid #3a2a10;font-size:9px;font-weight:400;}
+.gtbl td{background:white;padding:7px 5px;text-align:center;border:1px solid var(--border);}
+
+.footer{text-align:center;padding:22px 15px;color:var(--muted);font-size:10px;}
+.watermark{position:fixed;bottom:8px;right:8px;font-size:9px;color:rgba(0,0,0,0.12);z-index:100;pointer-events:none;}
+
+@media print{
+  .modal-bg,.tip-bg,.hist-bg,.ld-overlay,.tabs,.calc-btn,.hist-btn,.pdf-btn,.save-btn,.plan-banner,.copy-btn,.theme-grid,.watermark,.footer,.help-bar,.stitle,.tip{display:none!important;}
+  .header{background:white!important;border-bottom:2px solid var(--gold);}
+  .header h1,.header .plan-badge,.header-sub{color:#1a1410!important;}
+  main{padding:0!important;max-width:100%!important;}
+  .inp-card{display:none!important;}
+  .result{display:block!important;}
+  .page{display:block!important;padding:0!important;}
+  .p-head,.m-title,.dtbl th{background:#1a1410!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .dtbl .cur td{background:#fdf5e0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+@media(max-width:480px){.inp-grid.three{grid-template-columns:1fr 1fr;}.kanji{font-size:17px;}}
+</style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div class="ld-overlay" id="ldOverlay">
+  <div class="ld-ring"><div class="ld-kanji" id="ldKanji">☯</div></div>
+  <div class="ld-text">鑑定中...</div>
+</div>
+
+<!-- ウェルカムモーダル -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>四柱推命ツールへようこそ</h2>
+      <p>LITE PLAN · ライト版</p>
+    </div>
+    <div class="modal-body">
+      <div class="ms">
+        <h3>このツールでできること</h3>
+        <div class="mstep"><div class="mnum">1</div><div class="mtext"><strong>命式表を自動作成</strong><br>生年月日・時刻を入力するだけで年柱・月柱・日柱・時柱が自動表示されます。</div></div>
+        <div class="mstep"><div class="mnum">2</div><div class="mtext"><strong>五行バランスを確認</strong><br>命式の五行バランスを棒グラフで表示。不足している五行の補完アドバイスも確認できます。</div></div>
+        <div class="mstep"><div class="mnum">3</div><div class="mtext"><strong>鑑定書を自動生成</strong><br>日主別の性格・適職・健康・五行アドバイスが自動で表示されます。</div></div>
+      </div>
+      <div class="ms">
+        <h3>はじめての方へ</h3>
+        <div class="mstep"><div class="mnum">?</div><div class="mtext">画面内の<strong>「?」マーク</strong>をタップすると用語の説明が表示されます。</div></div>
+        <div class="mstep"><div class="mnum">◀</div><div class="mtext">表の中で<strong>「◀ 現在」「◀ 今年」</strong>と表示されている行が現在の運気です。</div></div>
+      </div>
+      <div class="mnote">
+        ※ スマートフォン・PCでご利用いただけます。<br>
+        ※ 計算結果は参考値です。流派によって異なる場合があります。<br>
+        ※ 時刻が不明な場合は「時刻が不明」を選択してください。
+      </div>
+      <button class="mstart" onclick="closeModal()">はじめる →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ツールチップ -->
+<div class="tip-bg hidden" id="tipBg" onclick="closeTip()">
+  <div class="tip-box" onclick="event.stopPropagation()">
+    <div class="tip-head"><h4 id="tipTitle"></h4><button class="tip-close" onclick="closeTip()">✕</button></div>
+    <div class="tip-body" id="tipBody"></div>
+  </div>
+</div>
+
+<!-- 履歴 -->
+<div class="hist-bg hidden" id="histBg" onclick="closeHist()">
+  <div class="hist-sheet" onclick="event.stopPropagation()">
+    <div class="hist-head"><h3>📚 保存済み命式</h3><button class="hist-close" onclick="closeHist()">✕</button></div>
+    <div id="histList"></div>
+  </div>
+</div>
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="plan-badge">LITE PLAN · ライト版</div>
+  <h1>四柱推命<br>命式表 ＆ 鑑定書</h1>
+  <p class="header-sub">スマートフォン・PC 対応 ／ インストール不要</p>
+</div>
+
+<main>
+  <div class="inp-card">
+    <h2>▷ 生年月日を入力してください</h2>
+    <p class="inp-hint">時刻が不明な場合は「時刻が不明」を選択してください。3柱で算出します。</p>
+    <div class="inp-grid">
+      <div class="field"><label>生年月日</label><input type="date" id="bd" value="1990-05-15"></div>
+      <div class="field">
+        <label>生まれた時刻</label>
+        <select id="btUnknown" onchange="toggleTime()" style="margin-bottom:5px">
+          <option value="known">時刻がわかる</option>
+          <option value="unknown">時刻が不明</option>
+        </select>
+        <input type="time" id="bt" value="10:30">
+      </div>
+    </div>
+    <div class="inp-grid three" style="margin-top:11px">
+      <div class="field"><label>性別</label><select id="gd"><option value="male">男性</option><option value="female">女性</option></select></div>
+      <div class="field"><label>蔵干流派</label><select id="sc"><option value="c">中国式（鳥海流）</option><option value="t">泰山式</option></select></div>
+      <div class="field"><label>日干支更新</label><select id="nc"><option value="23">23時切替</option><option value="0">24時</option></select></div>
+    </div>
+    <button class="calc-btn" onclick="calc()">命式を算出する</button>
+    <button class="hist-btn" onclick="openHist()">📚 保存済み命式を読み込む</button>
+  </div>
+
+  <div class="result" id="result">
+    <div class="tabs">
+      <div class="tab active" onclick="st(0)">命式表</div>
+      <div class="tab" onclick="st(1)">五行バランス</div>
+      <div class="tab" onclick="st(2)">鑑定書</div>
+    </div>
+    <div id="pg0" class="page active"></div>
+    <div id="pg1" class="page"></div>
+    <div id="pg2" class="page"></div>
+  </div>
+</main>
+
+<div class="watermark">四柱推命ツール · Lite</div>
+<div class="footer">ライト版 ─ 命式表 / 五行バランス / 鑑定書<br>© 四柱推命ツール</div>
+
+<script>
+// ═══ データ ═══
+var KAN=['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+var SHI=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+var GK=['木','木','火','火','土','土','金','金','水','水'];
+var GS=['水','土','木','木','土','火','火','土','金','金','土','水'];
+var IK=['陽','陰','陽','陰','陽','陰','陽','陰','陽','陰'];
+var GCOL={木:'#2d7a2d',火:'#8b2020',土:'#7a6010',金:'#4a6080',水:'#1a4880'};
+var GCC={木:'gki',火:'ghi',土:'gts',金:'gka',水:'gmi'};
+var ZOKAN={子:['壬'],丑:['己','癸','辛'],寅:['甲','丙','戊'],卯:['乙'],辰:['戊','乙','癸'],巳:['丙','庚','戊'],午:['丁','己'],未:['己','丁','乙'],申:['庚','壬','戊'],酉:['辛'],戌:['戊','辛','丁'],亥:['壬','甲']};
+var JUNIIN=['長生','沐浴','冠帯','建禄','帝旺','衰','病','死','墓','絶','胎','養'];
+var JSTART={甲:2,乙:8,丙:5,丁:11,戊:5,己:11,庚:8,辛:2,壬:11,癸:5};
+var TSUUHEN=['比肩','劫財','食神','傷官','偏財','正財','偏官','正官','偏印','印綬'];
+var TENYI={甲:'丑未',乙:'子申',丙:'亥酉',丁:'亥酉',戊:'丑未',己:'子申',庚:'丑未',辛:'寅午',壬:'卯巳',癸:'卯巳'};
+var BUNSH={甲:'巳',乙:'午',丙:'申',丁:'酉',戊:'申',己:'酉',庚:'亥',辛:'子',壬:'寅',癸:'卯'};
+var GOGYO_DESC={木:'成長・発展・向上心。春の気。',火:'情熱・表現・明るさ。夏の気。',土:'安定・信頼・育む力。土用の気。',金:'決断・洗練・収縮。秋の気。',水:'知恵・柔軟・流れ。冬の気。'};
+var TIPS={
+  天干:'甲・乙・丙・丁・戊・己・庚・辛・壬・癸の10種類。木・火・土・金・水の五行に対応し、陰と陽があります。',
+  地支:'子・丑・寅・卯・辰・巳・午・未・申・酉・戌・亥の12種類。いわゆる十二支のことです。',
+  通変星:'日干と他の干との関係を表す星。比肩・劫財・食神・傷官・偏財・正財・偏官・正官・偏印・印綬の10種類があります。',
+  十二運:'長生・沐浴・冠帯・建禄・帝旺・衰・病・死・墓・絶・胎・養の12段階。日干の強弱を表します。',
+  蔵干:'地支の中に隠れた天干のこと。表面には見えない隠れた要素として解釈に使われます。',
+  大運:'10年ごとに巡る大きな運勢の流れ。人生の大きなテーマや方向性を示します。',
+  年運:'1年ごとの運勢。その年の干支と日干との関係から運気の傾向を読みます。',
+  月運:'1ヶ月ごとの運勢。より細かい運気の変化を確認できます。',
+  五行:'木・火・土・金・水の5つの要素。命式の中でどの五行が多いかがバランスとして重要です。',
+  身強身弱:'身強はエネルギーが強い状態、身弱は弱い状態。どちらが良いということはありません。'
+};
+
+// ═══ 計算エンジン ═══
+function yks(y){var k=(y-4+1000)%10,s=(y-4+1200)%12;return{k:KAN[k],s:SHI[s],ki:k,si:s};}
+function mks(y,m){var si=(m+1)%12,yk=(y-4+1000)%10,kb=[2,4,6,8,0][yk%5],ki=(kb+m-1+10)%10;return{k:KAN[ki],s:SHI[si],ki:ki,si:si};}
+function dks(y,m,d){var b=new Date(2000,0,1),t=new Date(y,m-1,d),df=Math.round((t-b)/86400000),ki=((df+6)%10+10)%10,si=((df+4)%12+12)%12;return{k:KAN[ki],s:SHI[si],ki:ki,si:si};}
+function hks(dki,h){var si=Math.floor((h+1)/2)%12,kb=[0,2,4,6,8][dki%5],ki=(kb+si)%10;return{k:KAN[ki],s:SHI[si],ki:ki,si:si};}
+function tsv(dki,ki){return TSUUHEN[(ki-dki+10)%10];}
+function juv(dki,si){return JUNIIN[(si-(JSTART[KAN[dki]]||0)+12)%12];}
+function gogyo(ps){var c={木:0,火:0,土:0,金:0,水:0};ps.forEach(function(p){c[GK[p.ki]]++;c[GS[p.si]]++;});return c;}
+function calcDaiin(y,g,yki){
+  var yang=IK[yki]==='陽',male=g==='male',fwd=(yang&&male)||(!yang&&!male),res=[];
+  for(var i=0;i<10;i++){
+    var ki,si;
+    if(fwd){ki=(yki+2+i)%10;si=((yki*2+4+i)%12+12)%12;}
+    else{ki=((yki-1-i)%10+10)%10;si=((yki*2-3-i)%12+12)%12;}
+    res.push({age:3+i*10,end:12+i*10,k:KAN[ki],s:SHI[si],ki:ki,si:si,yr:y+3+i*10});
+  }
+  return res;
+}
+
+var PF={
+  甲:{気質:'大木のような揺るぎない意志と誠実さを持ちます。リーダーシップに優れ、義理と人情を何より大切にします。',適職:'教育・医療・建築・管理職など、人を育て社会に貢献する職種。',健康:'肝臓・胆のう・目に注意。ストレスをため込みやすいので定期的な気分転換を。'},
+  乙:{気質:'草木のようにしなやかで柔軟。細やかな気配りと高い適応力を持ちます。芸術的センスに優れる社交家です。',適職:'カウンセラー・デザイナー・美容師・秘書など、サポートや創造的な仕事。',健康:'肝臓・神経系に注意。十分な睡眠と休息を。'},
+  丙:{気質:'太陽のように明るく開放的。誰とでも打ち解け、場を華やかに照らす存在です。',適職:'営業・芸能・広報・政治家など、人前に出て輝く仕事。',健康:'心臓・血液に注意。意識的に休息を取ること。'},
+  丁:{気質:'ろうそくの炎のように繊細で深い感受性を持ちます。芸術的才能と思いやりに優れます。',適職:'芸術家・教師・料理人・医療従事者など、技と心が求められる仕事。',健康:'心臓・眼・精神疲労に注意。'},
+  戊:{気質:'大山のようにどっしりとした安定感と包容力。信頼性が高く周囲から頼られる存在。',適職:'不動産・農業・建設・公務員など、安定した基盤づくりに関わる仕事。',健康:'胃・脾臓に注意。規則正しい食生活を。'},
+  己:{気質:'田畑のように人を育み支える包容力があります。縁の下の力持ちとして活躍することが多い人。',適職:'教育・保育・医療・農業など、人や生命を育む仕事。',健康:'胃腸・膵臓に注意。無理をしないことが大切。'},
+  庚:{気質:'磨かれた鋼のような強さと鋭さ。強い意志と判断力、揺るぎない正義感を持つ人。',適職:'法律家・エンジニア・外科医・経営者など、強い意志と精度が求められる仕事。',健康:'肺・大腸・皮膚に注意。'},
+  辛:{気質:'宝石のように磨かれることで輝く繊細な美しさ。完璧主義的なこだわりと深い情を持つ人。',適職:'デザイン・美容・会計・外交など、精巧さと美的センスが活きる仕事。',健康:'肺・気管支・皮膚に注意。'},
+  壬:{気質:'大海のように広大で深い知性と包容力。旺盛な知的好奇心と型にはまらない発想力が特長。',適職:'研究者・作家・外交官など、深い思考と広い視野が活きる仕事。',健康:'腎臓・泌尿器に注意。体の冷えに気をつけて。'},
+  癸:{気質:'雨露のように静かに染み込む繊細な感受性と深い直感力の持ち主。',適職:'カウンセラー・占い師・医師・芸術家など、人の心に深く寄り添う仕事。',健康:'腎臓・膀胱に注意。冷えと過労を避けて。'}
+};
+
+// ═══ 状態 ═══
+var R=null;
+var KANJI_CYC=['☯','甲','子','乙','丑','丙','寅','丁','卯','戊','辰'];
+var ldTimer=null;
+var currentTheme='総合鑑定';
+var THEMES={
+  '総合鑑定':{icon:'☯',desc:'命式全体から性格・才能・人生の流れを総合的に鑑定してください。'},
+  '仕事・転職':{icon:'💼',desc:'仕事運・転職のタイミング・向いている職種について鑑定してください。'},
+  '恋愛・結婚':{icon:'💕',desc:'恋愛運・結婚運・良縁に恵まれる時期について鑑定してください。'},
+  '金運・財運':{icon:'💰',desc:'財運・稼ぎやすい時期・注意すべき時期について鑑定してください。'},
+  '今年の運勢':{icon:'📅',desc:'今年の運勢の流れ・チャンスの時期・気をつける時期を鑑定してください。'},
+  '健康運':{icon:'🌿',desc:'健康面での注意点・弱くなりやすい部位・体調管理のアドバイスをください。'}
+};
+
+// ═══ UI ═══
+function closeModal(){document.getElementById('modalBg').classList.add('hidden');}
+function showTip(title,body){document.getElementById('tipTitle').textContent=title;document.getElementById('tipBody').textContent=body;document.getElementById('tipBg').classList.remove('hidden');}
+function closeTip(){document.getElementById('tipBg').classList.add('hidden');}
+function toggleTime(){document.getElementById('bt').style.display=document.getElementById('btUnknown').value==='unknown'?'none':'block';}
+function st(i){document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('active',i===j);});document.querySelectorAll('.page').forEach(function(p,j){p.classList.toggle('active',i===j);});}
+
+function showLoading(){
+  var ol=document.getElementById('ldOverlay');ol.classList.add('show');
+  var i=0;ldTimer=setInterval(function(){document.getElementById('ldKanji').textContent=KANJI_CYC[i++%KANJI_CYC.length];},200);
+}
+function hideLoading(){clearInterval(ldTimer);document.getElementById('ldOverlay').classList.remove('show');}
+
+// ═══ 履歴 ═══
+var HIST_KEY='sc_hist_lite';
+function saveHist(){
+  if(!R)return;
+  var h=loadHistData();
+  var e={id:Date.now(),at:new Date().toLocaleDateString('ja-JP'),name:R.y+'/'+R.m+'/'+R.d+'生 '+(R.g==='male'?'男性':'女性'),bd:document.getElementById('bd').value,bt:R.unk?'':document.getElementById('bt').value,g:R.g,unk:R.unk||false,dk:KAN[R.dki]+'（'+GK[R.dki]+'）'};
+  var idx=h.findIndex(function(x){return x.bd===e.bd&&x.g===e.g;});
+  if(idx>=0)h.splice(idx,1);
+  h.unshift(e);if(h.length>20)h.pop();
+  localStorage.setItem(HIST_KEY,JSON.stringify(h));
+  var btn=document.getElementById('saveHistBtn');
+  if(btn){btn.textContent='✓ 保存しました';setTimeout(function(){btn.textContent='💾 この命式を保存';},2000);}
+}
+function loadHistData(){try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch(e){return[];}}
+function openHist(){
+  var h=loadHistData(),list=document.getElementById('histList');
+  if(!h.length){list.innerHTML='<div class="hist-empty">まだ保存された命式がありません。</div>';}
+  else{
+    list.innerHTML=h.map(function(x){
+      return '<div class="hist-item" onclick="loadHist('+x.id+')">'
+        +'<button class="hist-del" onclick="event.stopPropagation();delHist('+x.id+')">削除</button>'
+        +'<div class="hist-name">'+x.name+'</div>'
+        +'<div class="hist-info">日主：'+x.dk+' ／ 保存日：'+x.at+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  document.getElementById('histBg').classList.remove('hidden');
+}
+function closeHist(){document.getElementById('histBg').classList.add('hidden');}
+function loadHist(id){
+  var h=loadHistData(),e=h.find(function(x){return x.id===id;});
+  if(!e)return;
+  document.getElementById('bd').value=e.bd;
+  document.getElementById('gd').value=e.g;
+  document.getElementById('btUnknown').value=e.unk?'unknown':'known';
+  document.getElementById('bt').value=e.bt||'12:00';
+  toggleTime();closeHist();calc();
+}
+function delHist(id){
+  var h=loadHistData().filter(function(x){return x.id!==id;});
+  localStorage.setItem(HIST_KEY,JSON.stringify(h));openHist();
+}
+
+// ═══ 算出 ═══
+function calc(){
+  var bv=document.getElementById('bd').value,g=document.getElementById('gd').value;
+  if(!bv){alert('生年月日を入力してください');return;}
+  var unk=document.getElementById('btUnknown').value==='unknown';
+  var tv=document.getElementById('bt').value||'12:00';
+  var arr=bv.split('-'),y=+arr[0],m=+arr[1],d=+arr[2];
+  var h=+tv.split(':')[0];
+  showLoading();
+  setTimeout(function(){
+    var yp=yks(y),mp=mks(y,m),dp=dks(y,m,d),hp=hks(dp.ki,h);
+    var ps=unk?[yp,mp,dp]:[yp,mp,dp,hp];
+    R={y:y,m:m,d:d,h:h,g:g,ps:ps,dp:dp,dki:dp.ki,yp:yp,unk:unk,
+      ts:ps.map(function(p){return tsv(dp.ki,p.ki);}),
+      js:ps.map(function(p){return juv(dp.ki,p.si);}),
+      gv:gogyo(ps),dv:calcDaiin(y,g,yp.ki)};
+    rM();rBl();rKl();
+    document.getElementById('result').classList.add('show');
+    setTimeout(function(){document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});},100);
+    hideLoading();
+  },400);
+}
+
+// ═══ 命式表 ═══
+function gc(ki){return GCC[GK[ki]]||'gmi';}
+function gs(si){return GCC[GS[si]]||'gmi';}
+function mkTip(key){return '<span class="tip" onclick="showTip(\''+key+'\',\''+((TIPS[key]||'').replace(/'/g,'&#39;'))+'\'">?</span>';}
+
+function rM(){
+  var names=R.unk?['年柱','月柱','日柱']:['年柱','月柱','日柱','時柱'];
+  var descs=R.unk?['先祖・親との関係','親・青年期の環境','あなた自身']:['先祖・親との関係','親・青年期の環境','あなた自身','晩年・子どもとの関係'];
+  var dk=KAN[R.dki],dg=GK[R.dki];
+  var h='<div class="m-title">'+R.y+'年'+R.m+'月'+R.d+'日生 '+(R.g==='male'?'男命':'女命')+' ─ 命式表'+(R.unk?' ※時刻不明（'+names.length+'柱）':'')+'</div>';
+  h+='<div class="help-bar">💡 <strong>日柱の天干</strong>（日主）がご本人を表します。各ラベルの「?」をタップすると用語の説明が表示されます。</div>';
+  h+='<div class="m-grid">';
+  R.ps.forEach(function(p,i){
+    var zk=(ZOKAN[p.s]||[]).join('・');
+    h+='<div class="pillar">'
+      +'<div class="p-head">'+names[i]+'</div>'
+      +'<div class="p-desc">'+descs[i]+'</div>'
+      +'<div class="p-row"><div class="p-lbl">天干'+mkTip('天干')+'</div><div class="kanji '+gc(p.ki)+'">'+p.k+'</div><div class="p-sub">'+GK[p.ki]+'・'+IK[p.ki]+'</div></div>'
+      +'<div class="p-row"><div class="p-lbl">通変星'+mkTip('通変星')+'</div><div class="p-mid">'+(i===R.ps.indexOf(R.dp)?'─ 日主 ─':R.ts[i])+'</div></div>'
+      +'<div class="p-row"><div class="p-lbl">地支'+mkTip('地支')+'</div><div class="kanji '+gs(p.si)+'">'+p.s+'</div><div class="p-sub">'+GS[p.si]+'</div></div>'
+      +'<div class="p-row"><div class="p-lbl">十二運'+mkTip('十二運')+'</div><div class="p-mid" style="font-size:11px">'+R.js[i]+'</div></div>'
+      +'<div class="p-row"><div class="p-lbl">蔵干'+mkTip('蔵干')+'</div><div style="font-size:10px">'+(zk||'─')+'</div></div>'
+      +'</div>';
+  });
+  h+='</div>';
+  // 合冲
+  var shis=R.ps.map(function(p){return p.s;}).join(''),cks=[];
+  [['子','午','子午冲'],['卯','酉','卯酉冲'],['寅','申','寅申冲'],['亥','巳','亥巳冲']].forEach(function(x){if(shis.indexOf(x[0])>=0&&shis.indexOf(x[1])>=0)cks.push(x[2]);});
+  [['子申辰','水の三合会局'],['寅午戌','火の三合会局'],['巳酉丑','金の三合会局'],['亥卯未','木の三合会局']].forEach(function(x){if(x[0].split('').filter(function(c){return shis.indexOf(c)>=0;}).length>=3)cks.push(x[1]);});
+  // 特殊星
+  h+='<div class="stitle">特殊星・基本情報</div>';
+  h+='<div class="iblock"><h3>日主・守護星</h3>';
+  h+='<div class="irow"><span>日主（あなた）</span><span class="v '+gc(R.dki)+'">'+dk+'（'+dg+'・'+IK[R.dki]+'）</span></div>';
+  h+='<div class="irow"><span>天乙貴人</span><span class="v">'+(TENYI[dk]||'─')+'</span></div>';
+  h+='<div class="irow"><span>文昌貴人</span><span class="v">'+(BUNSH[dk]||'─')+'</span></div>';
+  h+='<div class="irow"><span>身強・身弱'+mkTip('身強身弱')+'</span><span class="v">'+(R.gv[dg]>=3?'身強（エネルギー強）':'身弱（エネルギー弱）')+'</span></div>';
+  h+='<div class="irow"><span>合・冲</span><span class="v">'+(cks.length?cks.join('・'):'特になし')+'</span></div></div>';
+  // 今年
+  var ty=new Date().getFullYear(),yk=yks(ty);
+  h+='<div class="stitle">今年（'+ty+'年）の年運'+mkTip('年運')+'</div>';
+  h+='<div class="iblock"><h3>今年の干支と本命との関係</h3>';
+  h+='<div class="irow"><span>今年の干支</span><span class="v '+gc(yk.ki)+'">'+yk.k+yk.s+'（'+GK[yk.ki]+'・'+IK[yk.ki]+'）</span></div>';
+  h+='<div class="irow"><span>通変星</span><span class="v">'+tsv(R.dki,yk.ki)+'</span></div>';
+  h+='<div class="irow"><span>十二運</span><span class="v">'+juv(R.dki,yk.si)+'</span></div></div>';
+  document.getElementById('pg0').innerHTML=h;
+}
+
+
+// ═══ ライト版：五行バランス（pg1）═══
+function rBl(){
+  var g=R.gv,total=0;
+  Object.keys(g).forEach(function(k){total+=g[k];});
+  var h='<div class="stitle" style="margin-top:0">五行バランス'+mkTip('五行')+'</div>';
+  h+='<div class="help-bar">💡 五行とは「木・火・土・金・水」の5つのエネルギー。不足している五行を補うことで運気が整います。</div>';
+  h+='<div class="bal-row">';
+  ['木','火','土','金','水'].forEach(function(e){
+    var pct=Math.round(g[e]/total*100);
+    h+='<div class="bal-item"><div class="bal-lbl '+GCC[e]+'">'+e+'</div><div class="bal-bar"><div class="bal-fill" style="height:'+pct+'%;background:'+GCOL[e]+'99"></div></div><div class="bal-cnt">'+g[e]+'個 '+pct+'%</div></div>';
+  });
+  h+='</div>';
+  h+='<table class="gtbl"><tr><th>五行</th><th>意味</th><th>量</th></tr>';
+  ['木','火','土','金','水'].forEach(function(e){
+    h+='<tr><td class="'+GCC[e]+'" style="font-size:18px;font-weight:700">'+e+'</td><td style="text-align:left;padding-left:9px">'+GOGYO_DESC[e]+'</td><td class="'+GCC[e]+'" style="font-weight:700">'+g[e]+'個</td></tr>';
+  });
+  h+='</table>';
+  var dg=GK[R.dki],sortedG=Object.keys(g).sort(function(a,b){return g[b]-g[a];}),str=sortedG[0],wk=sortedG[sortedG.length-1];
+  var hints={木:'緑野菜・植物を生活に',火:'赤い食材・運動・明るい場所',土:'黄・茶色の食材・規則正しい食生活',金:'白い食材・論理的な活動',水:'水分補給・黒豆・内省の時間'};
+  h+='<div class="iblock"><h3>命式分析</h3>';
+  h+='<div class="irow"><span>日主の五行</span><span class="v '+GCC[dg]+'">'+dg+'</span></div>';
+  h+='<div class="irow"><span>最も多い五行</span><span class="v '+GCC[str]+'">'+str+'（'+g[str]+'個）</span></div>';
+  h+='<div class="irow"><span>最も少ない五行</span><span class="v '+GCC[wk]+'">'+wk+'（'+g[wk]+'個）</span></div>';
+  h+='<div class="inote">▶ '+wk+'を補うには：'+hints[wk]+'</div></div>';
+  document.getElementById('pg1').innerHTML=h;
+}
+
+// ═══ ライト版：鑑定書（pg2）═══
+function rKl(){
+  var dk=KAN[R.dki],dg=GK[R.dki],p=PF[dk]||PF['甲'];
+  var sortedG=Object.keys(R.gv).sort(function(a,b){return R.gv[b]-R.gv[a];}),wk=sortedG[sortedG.length-1];
+  var ty=new Date().getFullYear();
+  var hints={木:'緑野菜・植物との接触',火:'赤い食材・適度な運動',土:'黄・茶色の食材・規則正しい食生活',金:'白い食材・論理的な活動',水:'水分補給・黒豆・内省の時間'};
+  var h='<div class="help-bar">📜 鑑定書はあなたの日主「<strong>'+dk+'</strong>」をもとに自動生成されています。</div>';
+  h+='<div class="kanteisho"><h3>気質・本性 ─ '+dk+'（'+dg+'）日主</h3><p>'+p.気質+'</p></div>';
+  h+='<div class="kanteisho"><h3>適職・仕事</h3><p>'+p.適職+'</p></div>';
+  h+='<div class="kanteisho"><h3>健康・注意点</h3><p>'+p.健康+'</p></div>';
+  h+='<div class="kanteisho"><h3>五行アドバイス</h3><p>'+wk+'の気が弱い傾向があります。<strong style="color:var(--gold)">'+hints[wk]+'</strong>を日常に取り入れることで運気が整います。今年（'+ty+'年）の通変星は<strong style="color:var(--gold)">'+tsv(R.dki,yks(ty).ki)+'</strong>です。</p></div>';
+  h+='<div class="plan-banner">✦ スタンダード版では大運・年運・月運・AIプロンプトも利用できます ✦</div>';
+  h+='<button class="pdf-btn" onclick="printK()">📄 PDF保存 / 印刷</button>';
+  h+='<button class="save-btn" id="saveHistBtn" onclick="saveHist()">💾 この命式を保存</button>';
+  document.getElementById('pg2').innerHTML=h;
+}
+
+// ═══ 大運・年運 ═══
+function rD(){
+  var ty=new Date().getFullYear();
+  var h='<div class="stitle" style="margin-top:0">大運表'+mkTip('大運')+'</div>';
+  h+='<div class="tblnote">💡 10年ごとに変わる大きな運勢の流れです。「◀ 現在」が今の大運期です。</div>';
+  h+='<table class="dtbl"><tr><th>年齢</th><th>西暦〜</th><th>天干</th><th>地支</th><th>五行</th><th>通変星</th><th>十二運</th></tr>';
+  R.dv.forEach(function(dv){
+    var cur=dv.yr<=ty&&ty<=dv.yr+9;
+    h+='<tr'+(cur?' class="cur"':'')+'>';
+    h+='<td>'+dv.age+'〜'+dv.end+'歳'+(cur?' ◀ 現在':'')+'</td>';
+    h+='<td>'+dv.yr+'年〜</td>';
+    h+='<td class="'+gc(dv.ki)+'">'+dv.k+'</td>';
+    h+='<td class="'+gs(dv.si)+'">'+dv.s+'</td>';
+    h+='<td>'+GK[dv.ki]+'</td>';
+    h+='<td style="color:var(--gold)">'+tsv(R.dki,dv.ki)+'</td>';
+    h+='<td style="color:var(--muted)">'+juv(R.dki,dv.si)+'</td>';
+    h+='</tr>';
+  });
+  h+='</table>';
+  h+='<div class="stitle">年運表（直近5年）'+mkTip('年運')+'</div>';
+  h+='<div class="tblnote">💡 「◀ 今年」が現在の年運です。</div>';
+  h+='<table class="dtbl"><tr><th>西暦</th><th>年齢</th><th>天干</th><th>地支</th><th>通変星</th><th>十二運</th></tr>';
+  for(var y=ty-1;y<=ty+3;y++){
+    var yk=yks(y),cur=y===ty;
+    h+='<tr'+(cur?' class="cur"':'')+'>';
+    h+='<td>'+y+'年'+(cur?' ◀ 今年':'')+'</td>';
+    h+='<td>'+(y-R.y)+'歳</td>';
+    h+='<td class="'+gc(yk.ki)+'">'+yk.k+'</td>';
+    h+='<td class="'+gs(yk.si)+'">'+yk.s+'</td>';
+    h+='<td style="color:var(--gold)">'+tsv(R.dki,yk.ki)+'</td>';
+    h+='<td style="color:var(--muted)">'+juv(R.dki,yk.si)+'</td>';
+    h+='</tr>';
+  }
+  h+='</table>';
+  document.getElementById('pg1').innerHTML=h;
+}
+
+// ═══ 月運 ═══
+function rMon(){
+  var now=new Date();
+  var h='<div class="stitle" style="margin-top:0">月運表（直近12ヶ月）'+mkTip('月運')+'</div>';
+  h+='<div class="tblnote">💡 「◀ 今月」が現在の月運です。</div>';
+  h+='<table class="dtbl"><tr><th>年月</th><th>月干</th><th>月支</th><th>五行</th><th>通変星</th><th>十二運</th></tr>';
+  for(var i=0;i<12;i++){
+    var dt=new Date(now.getFullYear(),now.getMonth()+i,1);
+    var mk=mks(dt.getFullYear(),dt.getMonth()+1);
+    var cur=i===0;
+    h+='<tr'+(cur?' class="cur"':'')+'>';
+    h+='<td>'+dt.getFullYear()+'/'+( dt.getMonth()+1)+(cur?' ◀ 今月':'')+'</td>';
+    h+='<td class="'+gc(mk.ki)+'">'+mk.k+'</td>';
+    h+='<td class="'+gs(mk.si)+'">'+mk.s+'</td>';
+    h+='<td>'+GK[mk.ki]+'</td>';
+    h+='<td style="color:var(--gold)">'+tsv(R.dki,mk.ki)+'</td>';
+    h+='<td style="color:var(--muted)">'+juv(R.dki,mk.si)+'</td>';
+    h+='</tr>';
+  }
+  h+='</table>';
+  h+='<div class="iblock"><h3>通変星の簡単な見方</h3>';
+  h+='<div class="irow"><span style="color:var(--gold)">比肩・劫財</span><span>独立・自立の運。自分らしく動く時期。</span></div>';
+  h+='<div class="irow"><span style="color:var(--gold)">食神・傷官</span><span>表現・創造の運。アイデアが活きる時期。</span></div>';
+  h+='<div class="irow"><span style="color:var(--gold)">偏財・正財</span><span>財運・お金の運。稼ぎやすい時期。</span></div>';
+  h+='<div class="irow"><span style="color:var(--gold)">偏官・正官</span><span>仕事・評価の運。昇進・認められる時期。</span></div>';
+  h+='<div class="irow"><span style="color:var(--gold)">偏印・印綬</span><span>学習・サポートの運。知識を得やすい時期。</span></div>';
+  h+='</div>';
+  document.getElementById('pg2').innerHTML=h;
+}
+
+// ═══ 五行バランス ═══
+function rB(){
+  var g=R.gv,total=0;
+  Object.keys(g).forEach(function(k){total+=g[k];});
+  var h='<div class="stitle" style="margin-top:0">五行バランス'+mkTip('五行')+'</div>';
+  h+='<div class="help-bar">💡 五行とは「木・火・土・金・水」の5つのエネルギー。バランスを確認し、不足している五行を補うことで運気が整います。</div>';
+  h+='<div class="bal-row">';
+  ['木','火','土','金','水'].forEach(function(e){
+    var pct=Math.round(g[e]/total*100);
+    h+='<div class="bal-item">'
+      +'<div class="bal-lbl '+GCC[e]+'">'+e+'</div>'
+      +'<div class="bal-bar"><div class="bal-fill" style="height:'+pct+'%;background:'+GCOL[e]+'99"></div></div>'
+      +'<div class="bal-cnt">'+g[e]+'個 '+pct+'%</div>'
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<div class="stitle">五行それぞれの意味</div>';
+  h+='<table class="gtbl"><tr><th>五行</th><th>意味・特徴</th><th>量</th></tr>';
+  ['木','火','土','金','水'].forEach(function(e){
+    h+='<tr><td class="'+GCC[e]+'" style="font-size:18px;font-weight:700">'+e+'</td>'
+      +'<td style="text-align:left;padding-left:9px">'+GOGYO_DESC[e]+'</td>'
+      +'<td class="'+GCC[e]+'" style="font-weight:700">'+g[e]+'個</td></tr>';
+  });
+  h+='</table>';
+  var dg=GK[R.dki];
+  var sortedG=Object.keys(g).sort(function(a,b){return g[b]-g[a];});
+  var str=sortedG[0],wk=sortedG[sortedG.length-1];
+  var hints={木:'緑野菜・植物を生活に取り入れる',火:'赤い食材・適度な運動・明るい場所で過ごす',土:'黄・茶色の食材・規則正しい食生活',金:'白い食材・論理的な活動',水:'水分補給・黒豆・内省の時間を持つ'};
+  h+='<div class="stitle">命式分析</div>';
+  h+='<div class="iblock"><h3>バランス分析'+mkTip('身強身弱')+'</h3>';
+  h+='<div class="irow"><span>日主の五行</span><span class="v '+GCC[dg]+'">'+dg+'</span></div>';
+  h+='<div class="irow"><span>最も多い五行</span><span class="v '+GCC[str]+'">'+str+'（'+g[str]+'個）</span></div>';
+  h+='<div class="irow"><span>最も少ない五行</span><span class="v '+GCC[wk]+'">'+wk+'（'+g[wk]+'個）</span></div>';
+  h+='<div class="irow"><span>身強・身弱</span><span class="v">'+(g[dg]>=3?'身強（エネルギー強め）':'身弱（エネルギー弱め）')+'</span></div>';
+  h+='<div class="inote">▶ <strong style="color:var(--gold)">'+wk+'を補うヒント</strong><br>'+hints[wk]+'ことで、五行のバランスが整い運気が安定します。</div>';
+  h+='</div>';
+  // pg3は存在しないのでスキップ
+}
+
+// ═══ 鑑定書 ═══
+function rK(){
+  var dk=KAN[R.dki],dg=GK[R.dki],p=PF[dk]||PF['甲'];
+  var sortedG=Object.keys(R.gv).sort(function(a,b){return R.gv[b]-R.gv[a];});
+  var wk=sortedG[sortedG.length-1];
+  var ty=new Date().getFullYear();
+  var hints={木:'緑野菜・植物との接触',火:'赤い食材・適度な運動',土:'黄・茶色の食材・規則正しい食生活',金:'白い食材・論理的な活動',水:'水分補給・黒豆・内省の時間'};
+  var h='<div class="help-bar">📜 鑑定書はあなたの日主「<strong>'+dk+'</strong>」をもとに自動生成されています。</div>';
+  h+='<div class="kanteisho"><h3>気質・本性 ─ '+dk+'（'+dg+'）日主</h3><p>'+p.気質+'</p></div>';
+  h+='<div class="kanteisho"><h3>適職・仕事</h3><p>'+p.適職+'</p></div>';
+  h+='<div class="kanteisho"><h3>健康・注意点</h3><p>'+p.健康+'</p></div>';
+  h+='<div class="kanteisho"><h3>五行アドバイス</h3><p>'+wk+'の気が弱い傾向があります。<strong style="color:var(--gold)">'+hints[wk]+'</strong>を日常に取り入れることで運気のバランスが整います。今年（'+ty+'年）の通変星は<strong style="color:var(--gold)">'+tsv(R.dki,yks(ty).ki)+'</strong>です。</p></div>';
+  h+='<div class="plan-banner">✦ スタンダード版では大運・年運・月運・AIプロンプトも利用できます ✦</div>';
+  h+='<button class="pdf-btn" onclick="printK()">📄 PDF保存 / 印刷</button>';
+  h+='<button class="save-btn" id="saveHistBtn" onclick="saveHist()">💾 この命式を保存</button>';
+  // pg4は存在しないのでスキップ
+}
+
+function printK(){
+  var ki=document.querySelectorAll('.tab').length-1;
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',i===ki);});
+  document.querySelectorAll('.page').forEach(function(p,i){p.classList.toggle('active',i===ki);});
+  setTimeout(function(){window.print();},150);
+}
+
+// ═══ AIプロンプト ═══
+function rPrompt(){
+  var keys=Object.keys(THEMES);
+  var h='<div class="stitle" style="margin-top:0">✦ AIプロンプト生成</div>';
+  h+='<div class="help-bar">💡 テーマを選んでプロンプトをコピー → ChatGPT・Claude・Geminiに貼るだけで詳しい鑑定書が作れます。</div>';
+  h+='<div class="stitle">相談テーマを選択</div><div class="theme-grid">';
+  keys.forEach(function(t){
+    var th=THEMES[t];
+    h+='<button class="theme-btn'+(currentTheme===t?' sel':'')+'" onclick="selTheme(\''+t+'\')">'+th.icon+' '+t+'</button>';
+  });
+  h+='</div><div class="stitle">生成されたプロンプト</div>';
+  h+='<div class="prompt-box" id="promptBox">'+buildPrompt(currentTheme)+'</div>';
+  h+='<button class="copy-btn" onclick="copyPrompt()">📋 プロンプトをコピーする</button>';
+  h+='<div class="iblock"><h3>使い方</h3>';
+  h+='<div class="irow"><span>① テーマを選ぶ</span></div>';
+  h+='<div class="irow"><span>② 「プロンプトをコピー」をタップ</span></div>';
+  h+='<div class="irow"><span>③ ChatGPT・Claude・Geminiを開く</span></div>';
+  h+='<div class="irow"><span>④ 貼り付けて送信するだけ</span></div></div>';
+  // pg5は存在しないのでスキップ
+}
+
+function selTheme(t){currentTheme=t;rPrompt();st(5);}
+
+function buildPrompt(theme){
+  if(!R)return'';
+  var names=R.unk?['年柱','月柱','日柱']:['年柱','月柱','日柱','時柱'];
+  var now=new Date(),ty=now.getFullYear(),yk=yks(ty);
+  var dnow=R.dv.filter(function(d){return d.yr<=ty&&ty<=d.yr+9;})[0];
+  var th=THEMES[theme]||THEMES['総合鑑定'];
+  var lines=[
+    'あなたは四柱推命の専門家です。以下の命式データをもとに、'+th.desc,
+    '',
+    '【命式データ】',
+    '生年月日：'+R.y+'年'+R.m+'月'+R.d+'日生まれ（'+(R.g==='male'?'男性':'女性')+'）',
+    '日主（あなた自身）：'+KAN[R.dki]+'（'+GK[R.dki]+'・'+IK[R.dki]+'）',
+    ''
+  ];
+  lines.push('命式：');
+  R.ps.forEach(function(p,i){
+    lines.push('　'+names[i]+'：'+p.k+p.s+'（通変星：'+R.ts[i]+'　十二運：'+R.js[i]+'）');
+  });
+  lines.push('');
+  var gEntries=Object.keys(R.gv).map(function(k){return k+'×'+R.gv[k]+'個';});
+  lines.push('五行バランス：'+gEntries.join('　'));
+  lines.push('身強・身弱：'+(R.gv[GK[R.dki]]>=3?'身強（エネルギーが強い）':'身弱（エネルギーが弱い）'));
+  lines.push('');
+  lines.push('今年（'+ty+'年）の運気：');
+  lines.push('　年干支：'+yk.k+yk.s+'（'+GK[yk.ki]+'・'+IK[yk.ki]+'）');
+  lines.push('　通変星：'+tsv(R.dki,yk.ki)+'　十二運：'+juv(R.dki,yk.si));
+  lines.push('現在の大運：'+(dnow?dnow.k+dnow.s+'（'+dnow.age+'〜'+dnow.end+'歳）':'不明'));
+  lines.push('');
+  lines.push('【鑑定書の作成をお願いします】');
+  lines.push('1. 日主の特徴と気質');
+  lines.push('2. '+theme+'に関する詳細な鑑定（メインパート）');
+  lines.push('3. 今年（'+ty+'年）の運気の流れとアドバイス');
+  lines.push('4. 開運のための具体的なヒント');
+  lines.push('5. 総合メッセージ');
+  lines.push('');
+  lines.push('わかりやすく、具体的にお願いします。');
+  return lines.join('\n');
+}
+
+function copyPrompt(){
+  var text=document.getElementById('promptBox').textContent;
+  navigator.clipboard.writeText(text).then(function(){
+    var btn=document.querySelector('[onclick="copyPrompt()"]');
+    btn.textContent='✓ コピーしました！ChatGPTに貼り付けてください';
+    btn.style.background='var(--ki)';
+    setTimeout(function(){btn.textContent='📋 プロンプトをコピーする';btn.style.background='var(--ink)';},3000);
+  }).catch(function(){
+    var el=document.createElement('textarea');
+    el.value=text;document.body.appendChild(el);el.select();
+    document.execCommand('copy');document.body.removeChild(el);
+    var btn=document.querySelector('[onclick="copyPrompt()"]');
+    btn.textContent='✓ コピーしました！';
+    setTimeout(function(){btn.textContent='📋 プロンプトをコピーする';},3000);
+  });
+}
+
+// ═══ PWA ═══
+if('serviceWorker' in navigator){
+  var swCode=[
+    "self.addEventListener('install',function(e){self.skipWaiting();});",
+    "self.addEventListener('activate',function(e){e.waitUntil(clients.claim());});",
+    "self.addEventListener('fetch',function(e){if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));}});"
+  ].join('');
+  var swBlob=new Blob([swCode],{type:'application/javascript'});
+  var swUrl=URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(function(){});
+}
+
+window.addEventListener('load',function(){setTimeout(calc,300);});
+</script>
+</body>
+</html>
